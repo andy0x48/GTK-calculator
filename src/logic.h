@@ -13,6 +13,8 @@ void reset_logic_state(void);
 void append_input(char c);
 void clear_input(void);
 const char *get_input(void);
+int has_eval_error(void);
+const char *eval_error_msg(void);
 const char *eval_expression(const char *expression);
 
 #endif //LOGIC_H
