@@ -11,7 +11,7 @@
 
 A retro-styled scientific calculator built with GTK3 and C, featuring a simple UI and mathematical expression parsing.
 
-![GTK Calculator](https://imgur.com/a/KugebSr)
+![Calculator UI](https://github.com/andy0x48/GTK-calculator/img/gtk-calc-v001.PNG "GTK Calculator UI")
 
 ### Features
 #### Current Implementation:
