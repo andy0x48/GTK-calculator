@@ -6,6 +6,9 @@
 //
 
 #include "ui.h"
+
+#include <ctype.h>
+
 #include "logic.h"
 
 #include <stdlib.h>
@@ -14,9 +17,56 @@
 static GtkWidget *input_entry;
 static GtkWidget *result_label;
 
+static gboolean update_entry = FALSE;
+
 // Update user input entry display with current buffer
 static void update_input_display(void) {
+	update_entry = TRUE;	// recursive call prevention
 	gtk_entry_set_text(GTK_ENTRY(input_entry), get_input());
+	update_entry = FALSE;
+}
+
+static void sync_entry_to_buffer(void) {
+	if (update_entry) {
+		return;		// no sync for program updates
+	}
+
+	const char *entry_text = gtk_entry_get_text(GTK_ENTRY(input_entry));
+
+	// Clear current buffer and rebuild from entry text
+	clear_input();
+
+	// Valid char check and amend
+	for (const char *c = entry_text; *c; c++) {
+		if (isdigit(*c) || strchr("+-*/()", *c) || *c == '.') {
+			append_input(*c);
+		}
+	}
+}
+
+// Evaluate current expression and display result
+static void eval_and_display(void) {
+	const char *input = get_input();
+
+	// Skip eval on empty expr
+	if (!input || strlen(input) == 0) {
+		return;
+	}
+
+	const char *output = eval_expression(input);
+
+	if (has_eval_error()) {
+		gtk_label_set_text(GTK_LABEL(result_label), eval_error_msg());
+		// User must fix error input at this point
+	}
+	else {
+		gtk_label_set_text(GTK_LABEL(result_label), output);
+		// Clear input after eval success
+		clear_input();
+		update_entry = TRUE;
+		gtk_entry_set_text(GTK_ENTRY(input_entry), "");
+		update_entry = FALSE;
+	}
 }
 
 /*
@@ -25,41 +75,79 @@ static void update_input_display(void) {
  *	---------------------------------------------------------------------------
  */
 
+// CB: Handle text changes in the entry widget
+static void handle_on_entry_changed(GtkEntry *entry, gpointer user_data) {
+	sync_entry_to_buffer();
+}
+
+// CB: Handle 'Enter' key press in the entry widget
+static void handle_on_entry_activate(GtkEntry *entry, gpointer user_data) {
+	eval_and_display();
+}
+
+// CB: Handle key press events
+static gboolean handle_on_key_press(GtkWidget *widget, GdkEventKey *event, gpointer user_data) {
+	// handle 'Esc' key to CLR
+	if (event->keyval == GDK_KEY_Escape) {
+		clear_input();
+		update_entry = TRUE;
+		gtk_entry_set_text(GTK_ENTRY(input_entry), "");
+		gtk_label_set_text(GTK_LABEL(result_label), "Result: ");
+		update_entry = FALSE;
+		return TRUE;
+	}
+
+	// Handle 'Del/Backspace'
+	if (event->keyval == GDK_KEY_Delete || event->keyval == GDK_KEY_BackSpace) {
+		// GDK to process this/sync via signal
+		return FALSE;
+	}
+	// if other keys, GDK handles this accordingly
+	return FALSE;
+}
+
 // CB: Handle button event for digits and operations
 static void handle_input_button(GtkButton *button, gpointer user_data) {
 	const char *label = gtk_button_get_label(button);
 	if (label && strlen(label) == 1) {
 		append_input(label[0]);
 		update_input_display();
+		gtk_editable_set_position(GTK_EDITABLE(input_entry), -1);
 	}
 }
 
 // CB: Handle button event for equals
 static void handle_equal_button(GtkButton *button, gpointer user_data) {
-	const char *input = get_input();
-	const char *output = eval_expression(input);
-
-	if (strncmp(output, "Error:", 6) == 0) {
-		gtk_label_set_text(GTK_LABEL(result_label), output);
-	}
-	else {
-		gtk_label_set_text(GTK_LABEL(result_label), output);
-		reset_logic_state();
-	}
-	gtk_entry_set_text(GTK_ENTRY(input_entry), "");
+	eval_and_display();
 }
 
 // CB: Handle button event for clear
 static void handle_clear_button(GtkButton *button, gpointer user_data) {
-	reset_logic_state();
 	clear_input();
+	update_entry = TRUE;
 	gtk_entry_set_text(GTK_ENTRY(input_entry), "");
 	gtk_label_set_text(GTK_LABEL(result_label), "Result: ");
+	update_entry = FALSE;
 }
 
 // CB: Handle button event for delete/remove character from buffer
 static void handle_del_button(GtkButton *button, gpointer user_data) {
-	g_print("REMOVE ME\n");
+	const char *current_text = gtk_entry_get_text(GTK_ENTRY(input_entry));
+	size_t len = strlen(current_text);
+
+	if (len > 0) {
+		// create new str w/o last char
+		char *new_text = g_strndup(current_text, len - 1);	// str alloc cpy
+		update_entry = TRUE;
+		gtk_entry_set_text(GTK_ENTRY(input_entry), new_text);
+		update_entry = FALSE;
+		g_free(new_text);	// temp str buffer freed
+
+		// sync with buffer
+		sync_entry_to_buffer();
+
+		gtk_editable_set_position(GTK_EDITABLE(input_entry), -1);
+	}
 }
 
 // CB: Handle button event for memory ops.
@@ -200,6 +288,11 @@ void show_main_window(void) {
 	gtk_entry_set_placeholder_text(GTK_ENTRY(input_entry), "Enter expression...");
 	gtk_entry_set_alignment(GTK_ENTRY(input_entry), 1.0);  // Right align
 	gtk_style_context_add_class(gtk_widget_get_style_context(input_entry), "entry-label");
+
+	g_signal_connect(input_entry, "changed", G_CALLBACK(handle_on_entry_changed), NULL);
+	g_signal_connect(input_entry, "activate", G_CALLBACK(handle_on_entry_activate), NULL);
+	g_signal_connect(main_window, "key-press-event", G_CALLBACK(handle_on_key_press), NULL);
+
 	gtk_box_pack_start(GTK_BOX(display_box), input_entry, TRUE, TRUE, 0);
 
 	// Generate scanline overlay box
