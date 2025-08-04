@@ -4,10 +4,10 @@
 ![GTK](https://img.shields.io/badge/GTK-736087?style=for-the-badge&logo=gtk&logoColor=white)
 
 ![GitHub stars](https://img.shields.io/github/stars/andy0x48/GTK-calculator?style=flat)
-![GitHub issues](https://img.shields.io/github/issues/andy0x48/GTK-calculator?style=flat)
+[![GitHub issues](https://img.shields.io/github/issues/andy0x48/GTK-calculator?style=flat)](https://github.com/andy0x48/GTK-calculator/issues)
 ---
-[!IMPORTANT]
-This project is still in early development.
+>[!IMPORTANT]
+>This project is still in early development.
 
 A retro-styled scientific calculator built with GTK3 and C, featuring a simple UI and mathematical expression parsing.
 
